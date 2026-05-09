@@ -25,7 +25,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    fetch('/dashboard.csv').then(r => r.text()).then(csv => {
+    fetch(import.meta.env.BASE_URL + 'dashboard.csv').then(r => r.text()).then(csv => {
       Papa.parse(csv, {
         header: true, skipEmptyLines: true,
         transformHeader: h => h.trim(),
