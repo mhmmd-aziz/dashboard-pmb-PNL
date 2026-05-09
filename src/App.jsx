@@ -2,12 +2,11 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Papa from 'papaparse';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  PieChart, Pie, Cell, LineChart, Line, Legend,
+  PieChart, Pie, Cell, LineChart, Line, Legend, LabelList,
 } from 'recharts';
 import { C, card, htitle } from './theme.js';
 import Tip from './Tip.jsx';
 import HBar from './HBar';
-import MapIndonesia from './MapIndonesia';
 import logoPNL from './assets/logopnl.png';
 
 const shortJalur = (s) => s
@@ -65,8 +64,9 @@ export default function App() {
     return Object.entries(c).sort((a, b) => b[1] - a[1]).slice(0, n).map(([name, value]) => ({ name, value }));
   };
 
-  const top5School   = useMemo(() => top('Sekolah', 5), [filtered]);
+  const top10School  = useMemo(() => top('Sekolah', 10), [filtered]);
   const top5Jurusan  = useMemo(() => top('Jurusan sekolah', 5), [filtered]);
+  const sumberInfo   = useMemo(() => top('Sumber Informasi', 10), [filtered]);
   const top10Kec     = useMemo(() => top('Kecamatan', 10), [filtered]);
   const top10Kab     = useMemo(() => top('Kabupaten/ Kota', 10), [filtered]);
   const provinsiPie  = useMemo(() => top('Provinsi', 8), [filtered]);
@@ -104,6 +104,22 @@ export default function App() {
     });
   }, [filtered, allTahun, provinsiPerTahun]);
 
+  // Sebaran per prodi stacked by tahun
+  const prodiPerTahun = useMemo(() => {
+    const prodiList = [...new Set(filtered.map(d => d['namaProdi']).filter(Boolean))];
+    return prodiList.map(prodi => {
+      const row = { name: prodi };
+      let total = 0;
+      allTahun.forEach(t => {
+        const cnt = filtered.filter(d => d['namaProdi'] === prodi && d['tahun masuk'] === t).length;
+        row[t] = cnt;
+        total += cnt;
+      });
+      row.total = total;
+      return row;
+    }).sort((a, b) => b.total - a.total);
+  }, [filtered, allTahun]);
+
   const jalurData = useMemo(() => {
     const c = {};
     filtered.forEach(d => { const j = d['nmJalurMasuk']; if (j) c[j] = (c[j] || 0) + 1; });
@@ -135,8 +151,7 @@ export default function App() {
         <div style={{ background: 'linear-gradient(135deg,#1d4ed8,#0891b2)', padding: '16px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
           <img src={logoPNL} alt="Logo PNL" style={{ width: 42, height: 42, objectFit: 'contain', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }} />
           <div>
-            <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', letterSpacing: '0.05em' }}>PMB DASHBOARD</div>
-            <div style={{ fontSize: 11, color: '#bae6fd', marginTop: 2 }}>Analisis Data Historis</div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', letterSpacing: '0.05em', lineHeight: 1.2 }}>DASHBOARD DATA<br/>HISTORIS PMB</div>
           </div>
         </div>
 
@@ -216,25 +231,7 @@ export default function App() {
       {/* MAIN */}
       <main style={{ flex: 1, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-        {/* Header with Search */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 10, padding: '10px 18px' }}>
-          <div style={{ fontWeight: 800, fontSize: 16, background: 'linear-gradient(90deg,#38bdf8,#818cf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            {activeTab === 'Dashboard' ? 'Visualisasi Data Historis PMB' : 'Data Mahasiswa Baru'}
-          </div>
-          
-          <div style={{ display: 'flex', alignItems: 'center', background: '#1e293b', border: '1px solid #334155', borderRadius: 6, padding: '4px 12px', width: 300 }}>
-            <input 
-              type="text" 
-              placeholder="Cari NIM, Nama, atau Sekolah..." 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ background: 'transparent', border: 'none', color: '#f8fafc', fontSize: 12, outline: 'none', width: '100%' }}
-            />
-            {searchQuery && (
-              <button onClick={() => setSearchQuery('')} style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 12 }}>✕</button>
-            )}
-          </div>
-        </div>
+
 
         {/* TAB CONTENT: DASHBOARD */}
         {activeTab === 'Dashboard' && (
@@ -249,55 +246,11 @@ export default function App() {
               ))}
             </div>
 
-            {/* ROW 2: Top 5 Sekolah | Top 5 Jurusan | Top 10 Kec | Provinsi Pie */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 220px', gap: 10 }}>
-              <div style={card}>
-                <div style={htitle}>Top 5 Asal Sekolah</div>
-                <HBar data={top5School} color="#3b82f6" />
-              </div>
-              <div style={card}>
-                <div style={htitle}>Top 5 Jurusan Sekolah</div>
-                <ResponsiveContainer width="100%" height={160}>
-                  <BarChart data={top5Jurusan} margin={{ top: 4, right: 4, left: -24, bottom: 90 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                    <XAxis dataKey="name" stroke="#334155" tick={{ fill: '#64748b', fontSize: 9 }} angle={-45} textAnchor="end" interval={0} />
-                    <YAxis stroke="#334155" tick={{ fill: '#64748b', fontSize: 9 }} />
-                    <Tooltip content={<Tip />} />
-                    <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                      {top5Jurusan.map((_, i) => <Cell key={i} fill={C[i % C.length]} />)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              <div style={card}>
-                <div style={htitle}>Top 10 Kecamatan</div>
-                <HBar data={top10Kec} color="#8b5cf6" />
-              </div>
-              <div style={card}>
-                <div style={htitle}>Sebaran Provinsi</div>
-                <ResponsiveContainer width="100%" height={110}>
-                  <PieChart>
-                    <Pie data={provinsiPie} dataKey="value" innerRadius={32} outerRadius={50} stroke="none" paddingAngle={3}>
-                      {provinsiPie.map((_, i) => <Cell key={i} fill={C[i % C.length]} />)}
-                    </Pie>
-                    <Tooltip content={<Tip />} />
-                  </PieChart>
-                </ResponsiveContainer>
-                {provinsiPie.slice(0, 5).map((p, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 5, marginTop: 4 }}>
-                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: C[i % C.length], flexShrink: 0, marginTop: 3 }} />
-                    <span title={p.name} style={{ fontSize: 9, color: '#94a3b8', flex: 1, lineHeight: 1.2 }}>{p.name}</span>
-                    <span style={{ fontSize: 9, fontWeight: 700, color: '#f8fafc', flexShrink: 0 }}>{p.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* ROW 3: Line | Jalur Masuk | Top 10 Kab */}
+            {/* ROW 1: Tren Pendaftaran, Top 5 Jurusan, Proporsi Prodi */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
               <div style={card}>
                 <div style={htitle}>Tren Pendaftaran per Program Studi</div>
-                <ResponsiveContainer width="100%" height={190}>
+                <ResponsiveContainer width="100%" height={180}>
                   <LineChart data={lineData} margin={{ top: 5, right: 10, left: -24, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                     <XAxis dataKey="tahun" stroke="#334155" tick={{ fill: '#64748b', fontSize: 10 }} />
@@ -308,10 +261,53 @@ export default function App() {
                   </LineChart>
                 </ResponsiveContainer>
               </div>
+              <div style={{ ...card, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <div style={htitle}>Top 5 Jurusan Sekolah</div>
+                <HBar data={top5Jurusan} color="#f59e0b" />
+              </div>
+              <div style={{ ...card, display: 'flex', flexDirection: 'column' }}>
+                <div style={htitle}>Proporsi per Program Studi</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
+                  <div style={{ flex: 1, height: 180 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={prodiDonut} dataKey="value" innerRadius={40} outerRadius={65} stroke="none" paddingAngle={3}>
+                          {prodiDonut.map((_, i) => <Cell key={i} fill={C[i % C.length]} />)}
+                        </Pie>
+                        <Tooltip content={<Tip />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div style={{ flex: 1.4, display: 'flex', flexDirection: 'column', gap: 5, overflowY: 'auto', maxHeight: 180, paddingRight: 4 }}>
+                    {(() => {
+                      const totalProdi = prodiDonut.reduce((s, p) => s + p.value, 0);
+                      return prodiDonut.map((p, i) => {
+                        const pct = totalProdi > 0 ? ((p.value / totalProdi) * 100).toFixed(1) : '0.0';
+                        return (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: C[i % C.length], flexShrink: 0, marginTop: 1 }} />
+                            <span title={p.name} style={{ fontSize: 10, color: '#94a3b8', flex: 1, lineHeight: 1.2 }}>{p.name}</span>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', flexShrink: 0 }}>{p.value}</span>
+                            <span style={{
+                              fontSize: 9, fontWeight: 600, flexShrink: 0,
+                              background: `${C[i % C.length]}22`, color: C[i % C.length],
+                              borderRadius: 4, padding: '1px 5px', textAlign: 'center',
+                            }}>{pct}%</span>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ROW 2: Jalur Masuk, Kab/Kota, Kecamatan */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
               <div style={card}>
                 <div style={htitle}>Sebaran Jalur Masuk</div>
-                <ResponsiveContainer width="100%" height={190}>
-                  <BarChart data={jalurData} margin={{ top: 4, right: 4, left: -24, bottom: 90 }}>
+                <ResponsiveContainer width="100%" height={210}>
+                  <BarChart data={jalurData} margin={{ top: 4, right: 4, left: -24, bottom: 85 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                     <XAxis dataKey="name" stroke="#334155" tick={{ fill: '#64748b', fontSize: 9 }} angle={-45} textAnchor="end" interval={0} />
                     <YAxis stroke="#334155" tick={{ fill: '#64748b', fontSize: 9 }} />
@@ -334,53 +330,46 @@ export default function App() {
                 <div style={htitle}>Top 10 Kabupaten / Kota</div>
                 <HBar data={top10Kab} color="#06b6d4" />
               </div>
+              <div style={card}>
+                <div style={htitle}>Top 10 Kecamatan</div>
+                <HBar data={top10Kec} color="#8b5cf6" />
+              </div>
             </div>
 
-            {/* ROW 4: Peta Indonesia + Donut Prodi */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 10 }}>
-              <div style={{ ...card, height: 280 }}>
-                <div style={htitle}>Peta Sebaran Pendaftar per Provinsi </div>
-                <div style={{ height: 240, position: 'relative' }}>
-                  <MapIndonesia provinsiMap={provinsiMap} provinsiPerTahun={provinsiPerTahun} allTahun={allTahun} />
-                </div>
+            {/* ROW 3: Sumber Info, Top 10 Sekolah, Provinsi */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+              <div style={card}>
+                <div style={htitle}>Sumber Informasi Pendaftar</div>
+                <HBar data={sumberInfo} color="#a3e635" />
               </div>
               <div style={card}>
-                <div style={htitle}>Proporsi per Program Studi</div>
-                <ResponsiveContainer width="100%" height={130}>
-                  <PieChart>
-                    <Pie data={prodiDonut} dataKey="value" innerRadius={40} outerRadius={60} stroke="none" paddingAngle={3}>
-                      {prodiDonut.map((_, i) => <Cell key={i} fill={C[i % C.length]} />)}
-                    </Pie>
-                    <Tooltip content={<Tip />} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 6, overflowY: 'auto', maxHeight: 100 }}>
-                  {prodiDonut.map((p, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: C[i % C.length], flexShrink: 0, marginTop: 3 }} />
-                      <span title={p.name} style={{ fontSize: 10, color: '#94a3b8', flex: 1, lineHeight: 1.2 }}>{p.name}</span>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', flexShrink: 0, marginTop: 1 }}>{p.value}</span>
-                    </div>
-                  ))}
+                <div style={htitle}>Top 10 Asal Sekolah</div>
+                <HBar data={top10School} color="#3b82f6" />
+              </div>
+              <div style={card}>
+                <div style={htitle}>Sebaran Provinsi</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, height: 210 }}>
+                  <div style={{ flex: 1, height: '100%' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={provinsiPie} dataKey="value" innerRadius={35} outerRadius={60} stroke="none" paddingAngle={3}>
+                          {provinsiPie.map((_, i) => <Cell key={i} fill={C[i % C.length]} />)}
+                        </Pie>
+                        <Tooltip content={<Tip />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {provinsiPie.map((p, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: C[i % C.length], flexShrink: 0, marginTop: 2 }} />
+                        <span title={p.name} style={{ fontSize: 10, color: '#94a3b8', flex: 1, lineHeight: 1.2 }}>{p.name}</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: '#f8fafc', flexShrink: 0 }}>{p.value}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-
-            {/* ROW 5: Top Provinsi per Tahun - Grouped Bar */}
-            <div style={card}>
-              <div style={htitle}>Sebaran Top Provinsi Pendaftar per Tahun</div>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={topProvGrouped} margin={{ top: 5, right: 10, left: -20, bottom: 80 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                  <XAxis dataKey="name" stroke="#334155" tick={{ fill: '#64748b', fontSize: 9 }} angle={-45} textAnchor="end" interval={0} />
-                  <YAxis stroke="#334155" tick={{ fill: '#64748b', fontSize: 9 }} />
-                  <Tooltip content={<Tip />} />
-                  <Legend wrapperStyle={{ fontSize: 10, color: '#64748b', paddingTop: 8 }} />
-                  {allTahun.map((t, i) => (
-                    <Bar key={t} dataKey={t} name={`Tahun ${t}`} fill={C[i % C.length]} radius={[3, 3, 0, 0]} />
-                  ))}
-                </BarChart>
-              </ResponsiveContainer>
             </div>
           </>
         )}
